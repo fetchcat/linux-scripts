@@ -1,6 +1,6 @@
-# archinstall
+# Arch Install
 
-Arch Install Bash Script
+## Arch Install Bash Script
 
 Easy Arch Install with choices from the following options:
 
@@ -18,3 +18,7 @@ Easy Arch Install with choices from the following options:
 
 > chmod +x archinstall/install.sh
 > ./archinstall/install.sh
+
+## Issues
+
+Be sure to post any issues, otherwise enjoy :)
