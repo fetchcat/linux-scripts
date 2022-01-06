@@ -1,14 +1,14 @@
 # Arch Install Bash Script
 
-## Information
+## About
 
-Easy Arch Install with choices from the following options:
+Easy Arch Install to a single drive (no swap) with the following options:
 
-- Drive to install to (shows available drives with capacity for ease of indentification)
+- Easily choose drive to install to (shows capacity for quick identification)
 - Ext4 or BTRFS filesystem (Ubuntu-style subvolumes for TimeShift)
 - Minimal Xfce, KDE, Cinnamon or no desktop
 - AMD or Intel Microcode
-- AMD, Intel, Nvidia and VMware/Virtualbox video drivers
+- AMD, Intel, Nvidia or VMware/Virtualbox video drivers
 
 ## Installation
 
@@ -17,6 +17,7 @@ Easy Arch Install with choices from the following options:
 > nano archinstall/install.sh and set Timezone and Locale for your area.
 
 > chmod +x archinstall/install.sh
+
 > ./archinstall/install.sh
 
 ## Issues
