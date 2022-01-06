@@ -19,7 +19,7 @@ statusMsg() {
 		echo -e "\e[31m-> $2\e[0m"
 		;;
 		"info" )
-		echo -e "\e[34m-> $2\e[0m"
+		echo -e "\e[94m-> $2\e[0m"
 		;;
 		"success" )
 		echo -e "\e[32m-> $2\e[0m"
