@@ -1,6 +1,6 @@
-# Arch Install
+# Arch Install Bash Script
 
-## Arch Install Bash Script
+## Information
 
 Easy Arch Install with choices from the following options:
 
