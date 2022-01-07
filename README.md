@@ -1,4 +1,4 @@
-# Arch Install Bash Script
+# Arch Install Bash Script (Needs Fixing)
 
 ## About
 
