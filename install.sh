@@ -305,9 +305,15 @@ set_users () {
 
 select_desktop() {
   PS3="Please Select Desktop Environment: " 
-    select desktop in Xfce4 KDE Cinnamon None
+    select desktop in Gnome Xfce4 KDE Cinnamon None
     do
       case $desktop in
+      Gnome)
+        statusMsg "info" "Installing Gnome..."
+        arch-chroot /mnt /bin/bash -e << EOF
+        pacman --noconfirm -S gnome-shell nautilus gnome-terminal guake gnome-tweak-tool gnome-control-center xdg-user-dirs gdm leafpad
+        systemctl enable gdm
+EOF
         Xfce4)
         statusMsg "info" "Installing Xfce4..."
         arch-chroot /mnt /bin/bash -e << EOF
