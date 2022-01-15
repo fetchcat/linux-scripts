@@ -1,13 +1,76 @@
-#! /usr/bin/bash
+#!/usr/bin/sh
 
-### --- Arch linux install script --- ###
+### --- Arch Install Script Configuration --- ###
 
-# - Timezone and Locale/Language - #
+## Localization and host ##
 
+CONSOLE_KEYMAP="us"
 TIMEZONE="America/Vancouver"
 LOCALE="en_US.UTF-8"
+REFLECTOR_COUNTRIES="CA,US"
+HOSTNAME="Arch"                        
 
-# - Adds colours standard echo - #
+## Install disk and partition scheme ##
+                                      
+INSTALL_DISK="/dev/vda"
+EFI_PARTITION="1"
+SWAP_PARTITION="2"
+ROOT_PARTITION="3"                                
+SWAP_PARTITION_SIZE="8G"
+ROOT_FILESYSTEM="ext4" # ext4 or btrfs
+
+BTRFS_PARTITION="2"
+
+## Desktop Environment - eg. Gnome minimal with firefox ##
+
+DESKTOP_ENVIRONMENT=(
+  "gnome-menus"
+  "nautilus"
+  "gnome-shell"
+  "gnome-terminal"
+  "gnome-tweak-tool"
+  "gnome-control-center"
+  "xdg-user-dirs"
+  "leafpad"
+  "firefox"
+)
+
+## Display Manager ##
+
+DISPLAY_MANAGER="gdm" # gdm, sddm or lightdm
+
+## Super User (added to wheel group)
+
+SUPER_USER="arch"
+
+## Microcode for processor ##
+
+MICROCODE="amd"
+
+## Base installation packages for pacstrap to install ##
+
+PACSTRAP=(
+  "base"
+  "linux" 
+  "linux-firmware"
+  "vim" 
+  "nano" 
+  "ntfs-3g"
+  "networkmanager" 
+  "alsa-utils" 
+  "wget" 
+  "curl" 
+  "rsync"
+  "grub"
+  "efibootmgr"
+  "reflector"
+  "sudo"
+  "xorg"
+)
+
+### --- --- --- Installation --- --- --- ###
+
+# - Status Messages - #
 
 # eg. statusmsg "info" "Installing package..." (shows blue)
 # eg. statusmsg "success" "Success!" (shows green)
@@ -19,7 +82,7 @@ statusMsg() {
 		echo -e "\e[31m-> $2\e[0m"
 		;;
 		"info" )
-		echo -e "\e[94m-> $2\e[0m"
+		echo -e "\e[34m-> $2\e[0m"
 		;;
 		"success" )
 		echo -e "\e[32m-> $2\e[0m"
@@ -30,392 +93,217 @@ statusMsg() {
 	esac
 }
 
-# - Language, time and locale - #
+## Set console keyboard layout ##
 
-set_ntp () {
-  statusMsg "info" "Setting NTP"
-  timedatectl set-ntp true
-}
+loadkeys $CONSOLE_KEYMAP
 
-set_timezone () {
-  statusMsg "info" "Setting Timezone to $TIMEZONE"
-  ln -sf /usr/share/zoneinfo/$TIMEZONE /mnt/etc/localtime
-}
+## Use NTP ##
 
-set_locale () {
-  mkdir /mnt/etc/                        
-  statusMsg "info" "Setting Locale ($LOCALE)"
-  touch /mnt/etc/locale.gen
-  touch /mnt/etc/locale.conf
-  echo "$LOCALE UTF-8" > /mnt/etc/locale.gen
-  echo "LANG=$LOCALE" > /mnt/etc/locale.conf
-}
+timedatectl set-ntp true
 
-# - Hostname - #
+## Test Internet - will stop script if no net. ##
 
-set_hostname () {
-  if [ ! -d /mnt/etc ]; then
-  mkdir /mnt/etc
-  fi
-  read -r -p "Hostname: " HOSTNAME
-  if [ -z "$HOSTNAME" ]; 
-    then
-      statusMsg "error" "Please enter a hostname..."
-      hostname_selector
-  fi
-  echo "$HOSTNAME" > /mnt/etc/hostname
-  statusMsg "success" "Setting Hostname to $HOSTNAME"
-}
+if nc -zw1 google.com 80; then
+  statusMsg "success" "Internet connection detected"
+else
+  statusMsg "error" "No internet connection"
+  return
+fi
 
-# - Generate hosts file - #
+## Partition disk ##
 
-set_hosts () {
-  if [ ! -d /mnt/etc ]; then
-  mkdir /mnt/etc
-  fi
-  statusMsg "info" "Creating hosts file"
-  cat > /mnt/etc/hosts << EOF
-  127.0.0.1 localhost
-  127.0.1.1 $HOSTNAME.local $HOSTNAME
-EOF
-}
+statusMsg "info" "Partitioning $INSTALL_DISK"
 
-# - Kernel selector - #
+case $ROOT_FILESYSTEM in
+  ext4)
+    parted --script $INSTALL_DISK \
+      mklabel gpt \
+      mkpart primary fat32 1MiB 512MiB \
+      name 1 "EFI" \
+      set 1 esp on \
+      mkpart primary linux-swap 513MiB $SWAP_PARTITION_SIZE \
+      mkpart primary $ROOT_FILESYSTEM $SWAP_PARTITION_SIZE 100% \
+      name 3 "ROOT"
 
-kernel_selector () {
-  echo "Select Linux Kernel"
-  echo "A: Stable (Vanilla)"
-  echo "B: Zen (Performance)"
-  read -r -p "Select Kernel (A or B): " choice
-  case $choice in 
-    [aA]) kernel="linux"
-      ;;
-    [bB] ) kernel="linux-zen"
-      ;;
-    * ) echo "Please select a kernel (A or B)"
-    kernel_selector
-  esac                                        
-}
+    mkfs.fat -F32 $INSTALL_DISK$EFI_PARTITION
+    mkswap $INSTALL_DISK$SWAP_PARTITION
+    mkfs.ext4 $INSTALL_DISK$ROOT_PARTITION
 
-# - Shows disks with size to install Arch on - #
+    statusMsg "info" "Mounting volumes on: $INSTALL_DISK"
 
-select_disk () {
-  statusMsg "info" "Available Disks:"
-  statusMsg "info" "------------"
-  lsblk -dn --output NAME,SIZE
-  statusMsg "info" "------------"
-  PS3="Please Select drive to install to (eg. sda, vda): " 
-  select ENTRY in $(lsblk -dpnoNAME|grep -P "/dev/sd|nvme|vd");
-  do
-      DISK=$ENTRY
-      statusMsg "success"  "Installing Arch Linux on $DISK."
-      break
-  done
-}
+    mount $INSTALL_DISK$ROOT_PARTITION /mnt
+    mkdir -p /mnt/boot/efi
+    mount $INSTALL_DISK$EFI_PARTITION /mnt/boot/efi
 
-# - Formats disk, then prompts for chice of EXT4 or BTRFS - #
+    swapon $INSTALL_DISK$SWAP_PARTITION
+    statusMsg "success" "Sucessfully formatted $INSTALL_DISK as ext4"
+    break
+    ;;
+  btrfs)
+    parted --script $INSTALL_DISK \
+      mklabel gpt \
+      mkpart primary fat32 1MiB 350MiB \
+      set 1 esp on \
+      name 1 "EFI" \
+      mkpart primary btrfs 351MiB 100% \
+      name 2 "ROOT"
 
-format_disk () {
-  read -r -p "Destroy all data on $DISK [y/N]? " response
+    mkfs.vfat $INSTALL_DISK$EFI_PARTITION
+    mkfs.btrfs $INSTALL_DISK$BTRFS_PARTITION
 
-  response=${response,,}
-  if [[ "$response" =~ ^(yes|y)$ ]]; then
-    statusMsg "info" "Wiping $DISK."
-    wipefs -af "$DISK"
-    sgdisk -Zo "$DISK"
-  else
-  statusMsg "error" "Quitting."
-    exit
-  fi
-  PS3="Please Select installation type: " 
-  select filesystem in EXT4 BTRFS;
-  do
-    case $filesystem in
-      EXT4) ext4_bootstrap
-      break
-      ;;
-      BTRFS) btrfs_bootstrap
-      break
-      ;;
-      *) statusMsg "error"  "No filesystem specified"
-      ;;
-    esac
-  done
-}
+    statusMsg "info" "Mounting volumes on: $INSTALL_DISK"
 
-# - Use BTRFS filesystem with Ubuntu-style subvolumes - #
+    mount $INSTALL_DISK$BTRFS_PARTITION /mnt
+    btrfs su cr /mnt/@
+    btrfs su cr /mnt/@home
+    btrfs su cr /mnt/@var
+    umount /mnt
 
-btrfs_bootstrap () {
-  statusMsg "info" "Creating the partitions on $DISK."
-  parted -s "$DISK" \
-    mklabel gpt \
-    mkpart primary fat32 1MiB 513MiB \
-    name 1 BOOT \
-    set 1 esp on \
-    mkpart primary 513MiB 100% \
-    name 2 ROOT \
+    mount -o noatime,compress=zstd,ssd,discard=async,space_cache=v2,subvol=@ $INSTALL_DISK$BTRFS_PARTITION /mnt
 
-  statusMsg "info" "Formatting EFI Partition"
-  mkfs.fat -F32 /dev/disk/by-partlabel/BOOT
+    mkdir -p /mnt/{boot/efi,home,var}
 
-  statusMsg "info" "Formatting Root Partition as BTRFS"
-  mkfs.btrfs -L ROOT /dev/disk/by-partlabel/ROOT
-  
-  statusMsg "info" "Mounting Root Partition"
-  mount /dev/disk/by-partlabel/ROOT /mnt
+    mount -o noatime,compress=zstd,ssd,discard=async,space_cache=v2,subvol=@home $INSTALL_DISK$BTRFS_PARTITION /mnt/home
 
-  statusMsg "info" "Creating BTRFS Subvolumes"
-  for volume in @ @home @snapshots
-  do
-    btrfs su cr /mnt/$volume
-  done
+    mount -o noatime,compress=zstd,ssd,discard=async,space_cache=v2,subvol=@var $INSTALL_DISK$BTRFS_PARTITION /mnt/var
+    mount $INSTALL_DISK$EFI_PARTITION /mnt/boot/efi/
+    statusMsg "success" "Sucessfully formatted $INSTALL_DISK as btrfs"
+    ;;
+  *)
+    statusMsg "error" "Filesystem type unavailable"
+    return
+esac
 
-  umount /mnt
+## Install base Arch packages ##
 
-  statusMsg "info" "Mounting Subvolumes"
-  mount -o noatime,compress=zstd,space_cache=v2,subvol=@ /dev/disk/by-partlabel/ROOT /mnt
-  mkdir -p /mnt/{boot,home,.snapshots}
-  mount /dev/disk/by-partlabel/BOOT /mnt/boot
-  mount -o noatime,compress=zstd,space_cache=v2,subvol=@home /dev/disk/by-partlabel/ROOT /mnt/home
-  mount -o noatime,compress=zstd,space_cache=v2,subvol=@snapshots /dev/disk/by-partlabel/ROOT /mnt/.snapshots
-}
+statusMsg "info" "Installing base packages"
 
-# - Standard EXT4 install with single partition - #
+for i in ${PACSTRAP[@]};
+do
+  pacstrap /mnt $i
+done
 
-ext4_bootstrap () {
-  statusMsg "info" "Creating the partitions on $DISK."
-  parted -s "$DISK" \
-    mklabel gpt \
-    mkpart primary fat32 1MiB 513MiB \
-    name 1 BOOT \
-    set 1 esp on \
-    mkpart primary 513MiB 100% \
-    name 2 ROOT \
+## Generate FSTAB ##
 
-  statusMsg "info" "Formatting EFI Partition"
-  mkfs.fat -F32 /dev/disk/by-partlabel/BOOT
+statusMsg "info" "Generating FSTAB"
 
-  statusMsg "info" "Formatting Root Partition as ext4"
-  mkfs.ext4 /dev/disk/by-partlabel/ROOT
+genfstab -U /mnt >> /mnt/etc/fstab
 
-  statusMsg "info" "Mounting Root Partition"
-  mount /dev/disk/by-partlabel/ROOT /mnt
-}
+## Set timezone ##
 
-# - Installs GRUB bootloader - #
+statusMsg "info" "Setting timezone"
 
-grub_bootstrap () {
-  statusMsg "info" "Installing GRUB"
-  grub-install --target=x86_64-efi --efi-directory=/boot/ --bootloader-id=GRUB
-  statusMsg "info" "Creating GRUB configuration file"
-  grub-mkconfig -o /boot/grub/grub.cfg
-  statusMsg "info" "Generating fstab"
-  
-}
+arch-chroot /mnt ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
 
-# - Installs Arch base - #
+## Set clock ##
 
-pacstrap_base () {
-  statusMsg "info" "Installing base system"
-  pacstrap /mnt base $kernel $kernel-headers networkmanager grub efibootmgr nano alsa-utils grub rsync curl base-devel ntfs-3g nano sudo wget xdg-utils xdg-user-dirs
+statusMsg "info" "Setting hardware clock"
 
-  statusMsg "info" "Generating FSTAB"
+arch-chroot /mnt hwclock --systohc
 
-  genfstab -U /mnt >> /mnt/etc/fstab
-}
+## Set Locale ##
 
-# - Select video driver - #
+statusMsg "info" "Setting locale as: $LOCALE"
 
-video_selector() {
-    PS3="Please select primary video driver: " 
-    select video_driver in AMD Intel Nvidia VirtualBox
-    do
-      case $video_driver in
-        AMD)
-          arch-chroot /mnt pacman --noconfirm -S xf86-video-amdgpu
-          break
-          ;;
-        Intel)
-          arch-chroot /mnt pacman --noconfirm -S xf86-video-intel
-          break
-          ;;
-        Nvidia)
-          arch-chroot /mnt pacman --noconfirm -S nvidia nvidia-utils
-          break
-          ;;
-        VirtualBox)
-          arch-chroot /mnt pacman --noconfirm -S xf86-video-vmware virtualbox-guest-utils
-          break
-          ;;
-        None)
-          break
-          ;;
-        *)
-          statusMsg "error" "Please select a valid Video option"
-          video_selector
-          ;;
-      esac
-    done
-}
+echo "$LOCALE UTF-8" >> /mnt/etc/locale.gen
 
-# - Select microcode - #
+arch-chroot /mnt locale-gen
 
-ucode_selector() {
-    PS3="Please select CPU Microcode: " 
-    select ucode in AMD Intel None
-    do
-      case $ucode in
-        AMD)
-          arch-chroot /mnt pacman --noconfirm -S amd-ucode
-          break
-          ;;
-        Intel)
-          arch-chroot /mnt pacman --noconfirm -S intel-ucode
-          break
-          ;;
-        None)
-          break
-          ;;
-        *)
-          statusMsg "error" "Please select CPU Microcode"
-          ucode_selector
-          ;;
-      esac
-    done
-}
+## Set language ##
 
-# - Set root password and create super user - #
+echo "LANG=$LOCALE" >> /mnt/etc/locale.conf
 
-set_users () {
-  # Set Root Password
-  statusMsg "info" "Set Root Password: "
-  arch-chroot /mnt /bin/passwd
+## Set console keymap ##
 
-  read -r -p "Super User: (or blank for none) " username
-  if [ -n "$username" ]; 
-    then
-      arch-chroot /mnt useradd -mG wheel -s /bin/bash "$username"
-      sed -i 's/# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/' /mnt/etc/sudoers
-      echo "Setting user password for $username." 
-      arch-chroot /mnt /bin/passwd "$username"
-  fi
-}
+statusMsg "info" "Setting console keymap as: $CONSOLE_KEYMAP"
 
-# - Select Desktop - KDE, Xfce, Cinnamon or None - #
+echo "KEYMAP=$CONSOLE_KEYMAP" >> /mnt/etc/vconsole.conf
 
-select_desktop() {
-  PS3="Please Select Desktop Environment: " 
-    select desktop in Gnome Xfce4 KDE Cinnamon None
-    do
-      case $desktop in
-      Gnome)
-        statusMsg "info" "Installing Gnome..."
-        arch-chroot /mnt /bin/bash -e << EOF
-        pacman --noconfirm -S gnome-shell nautilus gnome-terminal guake gnome-tweak-tool gnome-control-center xdg-user-dirs gdm leafpad
-        systemctl enable gdm
-EOF
-        Xfce4)
-        statusMsg "info" "Installing Xfce4..."
-        arch-chroot /mnt /bin/bash -e << EOF
-        pacman --noconfirm -S xorg xfce4 xfce4-goodies xfce4-whiskermenu-plugin lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings engrampa
-        systemctl enable lightdm
-EOF
-        break
-        ;;
-        KDE)
-        statusMsg "info" "Installing KDE..."
-        arch-chroot /mnt /bin/bash -e << EOF
-        pacman --noconfirm -S plasma-desktop dolphin dolphin-plugins konsole ark kwrite plasma-nm plasma-pa kdeplasma-addons kde-gtk-config powerdevil bluedevil kscreen kinfocenter plasma-browser-integration breeze-gtk sddm sddm-kcm discover packagekit-qt5
-        systemctl enable sddm
-EOF
-        break
-        ;;
-        Cinnamon)
-        statusMsg "info" "Installing Cinnamon..."
-        arch-chroot /mnt /bin/bash -e << EOF
-        pacman --noconfirm -S xorg cinnamon lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings gnome-keyring gnome-terminal metacity leafpad engrampa guake
-        systemctl enable lightdm
-EOF
-        break
-        ;;
-        None)
-        statusMsg "info" "Installing no desktop environment"
-        break
-        ;;
-        *) statusMsg "error" "No environment specified"
-        select_desktop
-        ;;
-      esac
-    done
-}
+## Set Hostname ##
 
-#### --- Install --- ###
+statusMsg "info" "Setting hostname as: $HOSTNAME"
 
-statusMsg "info" "Arch Install Script"
+echo "$HOSTNAME" >> /mnt/etc/hostname
 
-## Enable NTP
-set_ntp
+## Install GRUB to boot partition ##
 
-## Select disk to install to
-select_disk
+statusMsg "info" "Installing Grub"
 
-## Formats disk as either BTRFS or EXT4
-format_disk
+arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB
 
-## Prompt for Hostname
-set_hostname
+arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
 
-## Auto-generate hosts file
-set_hosts
+## Enable NetworkManager ##
 
-## Select between Standard and Zen Kernels
-kernel_selector
+statusMsg "info" "Enabling NetworkManager"
 
-## Set Locale to America-Vancouver with en_US.UTF-8
-set_locale
+arch-chroot /mnt systemctl enable NetworkManager
 
-## Generates 10 best mirrors
+## Generate Pacman mirrors with Reflector ##
 
-statusMsg "info" "Generating best 10 Arch mirrors"
-reflector --country 'CA,US' --protocol http,https --sort rate -l 10 --save /mnt/etc/pacman.d/mirrorlist
+statusMsg "info" "Generating best mirrors"
 
-## Update Pacman
+reflector --country "$REFLECTOR_COUNTRIES" --protocol http,https --sort rate -l 10 --save /mnt/etc/pacman.d/mirrorlist
 
-statusMsg "info" "Updating Pacman"
+## Update Pacman repos ##
+
+statusMsg "info" "Updating mirrors"
+
 arch-chroot /mnt pacman -Syu --noconfirm
 
-## Installs base + core utilities
-pacstrap_base
+## Install CPU microcode ##
 
-## Select CPU Microcode
-ucode_selector
+statusMsg "info" "Installing $MICROCODE microcode"
 
-## Select Video Driver
-video_selector
+arch-chroot /mnt pacman -S --noconfirm "$MICROCODE-ucode"
 
-## Create Users
-set_users
+## Enabling BTRFS Module ##
 
-## Sets timezone to America/Vancouver
-set_timezone
+if [ $ROOT_FILESYSTEM == "btrfs" ]; 
+  then
+    statusMsg "info" "Creating initial ramdisk environment with btrfs support"
+    sed -i "s/MODULES=()/MODULES=(btrfs)/" /etc/mkinitcpio.conf
+    arch-chroot /mnt mkinitcpio -p linux
+  else
+    statusMsg "info" "Creating initial ramdisk environment"
+    arch-chroot /mnt mkinitcpio -P
+fi
 
-# Post install, configure boot, NetworkManager, clock
-arch-chroot /mnt /bin/bash -e << EOF
-locale-gen
-echo -e "Mounting boot"
-mkdir /boot/efi
-mount /dev/disk/by-partlabel/BOOT /boot/efi
-echo -e "Installing GRUB"
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB
-echo -e "Creating GRUB configuration file"
-grub-mkconfig -o /boot/grub/grub.cfg
-echo -e "Setting Hardware Clock"
-hwclock --systohc
-systemctl enable NetworkManager
-EOF
+## Install packages for desktop environment ##
 
-## Select Desktop
-select_desktop
+statusMsg "info" "Installing Desktop Environment"
 
-statusMsg "success" "Done. You can reboot :)"
-exit
+for pkg in ${DESKTOP_ENVIRONMENT[@]};
+  do
+    arch-chroot /mnt pacman -S --noconfirm $pkg
+  done
+
+## Install and enable display manager ##
+
+statusMsg "info" "Installing and enabling Display Manager: $DISPLAY_MANAGER"
+
+arch-chroot /mnt pacman -S --noconfirm $DISPLAY_MANAGER
+arch-chroot /mnt systemctl enable $DISPLAY_MANAGER
+
+## Adds super user to system and wheel group ##
+
+statusMsg "info" "Setting permissions for super user: $SUPER_USER"
+
+arch-chroot /mnt useradd -mG wheel -s /bin/bash $SUPER_USER
+sed -i "s/# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/" /mnt/etc/sudoers
+
+## Set passwords ##
+
+echo -e "Set Root password: "
+arch-chroot /mnt /bin/passwd
+
+echo -e "Set password for $SUPER_USER: "
+arch-chroot /mnt /bin/passwd "$SUPER_USER"
+
+## Unmounts drive ##
+
+umount -R /mnt
+
+## Done ##
+
+statusMsg "success" "Finished installing Arch. You may now reboot"
