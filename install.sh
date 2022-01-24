@@ -13,26 +13,20 @@ HOSTNAME="Arch"
 ## Install disk and partition scheme ##
                                       
 INSTALL_DISK="/dev/vda"
-EFI_PARTITION="1"
-SWAP_PARTITION="2"
-ROOT_PARTITION="3"                                
-SWAP_PARTITION_SIZE="8G"
-ROOT_FILESYSTEM="ext4" # ext4 or btrfs
-
-BTRFS_PARTITION="2"
+SWAP_PARTITION_SIZE="8G" # ext4 only. For btrfs, use zram from AUR
+ROOT_FILESYSTEM="ext4" # ext4 or btrfs.
 
 ## Desktop Environment - eg. Gnome minimal with firefox ##
 
 DESKTOP_ENVIRONMENT=(
-  "gnome-menus"
-  "nautilus"
   "gnome-shell"
-  "gnome-terminal"
-  "gnome-tweak-tool"
+  "gnome-tweaks"
   "gnome-control-center"
-  "xdg-user-dirs"
-  "leafpad"
+  "gnome-menus"
+  "gnome-terminal"
   "firefox"
+  "gedit"
+  "nautilus"
 )
 
 ## Display Manager ##
@@ -56,6 +50,7 @@ PACSTRAP=(
   "vim" 
   "nano" 
   "ntfs-3g"
+  "btrfs-progs"
   "networkmanager" 
   "alsa-utils" 
   "wget" 
@@ -64,8 +59,11 @@ PACSTRAP=(
   "grub"
   "efibootmgr"
   "reflector"
-  "sudo"
   "xorg"
+  "sudo"
+  "os-prober"
+  "xdg-utils"
+  "xdg-user-dirs"
 )
 
 ### --- --- --- Installation --- --- --- ###
@@ -93,6 +91,15 @@ statusMsg() {
 	esac
 }
 
+## Check EFI ##
+
+if [ "$(ls -A /sys/firmware/efi/efivars)" ]; then
+  statusMsg "success" "EFI Mode detected. Proceeding with install"
+else
+  statusMsg "error" "Legacy BIOS mode detected. Installation aborted"
+  exit 1
+fi
+
 ## Set console keyboard layout ##
 
 loadkeys $CONSOLE_KEYMAP
@@ -107,7 +114,7 @@ if nc -zw1 google.com 80; then
   statusMsg "success" "Internet connection detected"
 else
   statusMsg "error" "No internet connection"
-  return
+  exit 1
 fi
 
 ## Partition disk ##
@@ -122,20 +129,25 @@ case $ROOT_FILESYSTEM in
       name 1 "EFI" \
       set 1 esp on \
       mkpart primary linux-swap 513MiB $SWAP_PARTITION_SIZE \
-      mkpart primary $ROOT_FILESYSTEM $SWAP_PARTITION_SIZE 100% \
+      mkpart primary ext4 $SWAP_PARTITION_SIZE 100% \
       name 3 "ROOT"
 
-    mkfs.fat -F32 $INSTALL_DISK$EFI_PARTITION
-    mkswap $INSTALL_DISK$SWAP_PARTITION
-    mkfs.ext4 $INSTALL_DISK$ROOT_PARTITION
+    # Easy Partition Vars
+    EFI_PART="${INSTALL_DISK}1"
+    SWAP_PART="${INSTALL_DISK}2"
+    EXT4_PART="${INSTALL_DISK}3"
+
+    mkfs.fat -F32 $EFI_PART
+    mkswap $SWAP_PART
+    mkfs.ext4 $EXT4_PART
 
     statusMsg "info" "Mounting volumes on: $INSTALL_DISK"
 
-    mount $INSTALL_DISK$ROOT_PARTITION /mnt
-    mkdir -p /mnt/boot/efi
-    mount $INSTALL_DISK$EFI_PARTITION /mnt/boot/efi
+    mount $EXT4_PART /mnt
+    mkdir -p /mnt/boot
+    mount $EFI_PART /mnt/boot
 
-    swapon $INSTALL_DISK$SWAP_PARTITION
+    swapon $SWAP_PART
     statusMsg "success" "Sucessfully formatted $INSTALL_DISK as ext4"
     break
     ;;
@@ -148,26 +160,33 @@ case $ROOT_FILESYSTEM in
       mkpart primary btrfs 351MiB 100% \
       name 2 "ROOT"
 
-    mkfs.vfat $INSTALL_DISK$EFI_PARTITION
-    mkfs.btrfs $INSTALL_DISK$BTRFS_PARTITION
+    # Easy Partition Vars
+    EFI_PART="${INSTALL_DISK}1"
+    BTRFS_PART="${INSTALL_DISK}2"
+
+    mkfs.vfat $EFI_PART
+    mkfs.btrfs $BTRFS_PART
 
     statusMsg "info" "Mounting volumes on: $INSTALL_DISK"
 
-    mount $INSTALL_DISK$BTRFS_PARTITION /mnt
+    mount $BTRFS_PART /mnt
     btrfs su cr /mnt/@
     btrfs su cr /mnt/@home
     btrfs su cr /mnt/@var
     umount /mnt
 
-    mount -o noatime,compress=zstd,ssd,discard=async,space_cache=v2,subvol=@ $INSTALL_DISK$BTRFS_PARTITION /mnt
+    mount -o noatime,compress=zstd,ssd,discard=async,space_cache=v2,subvol=@ $BTRFS_PART /mnt
 
-    mkdir -p /mnt/{boot/efi,home,var}
+    mkdir -p /mnt/{boot,home,var}
 
-    mount -o noatime,compress=zstd,ssd,discard=async,space_cache=v2,subvol=@home $INSTALL_DISK$BTRFS_PARTITION /mnt/home
+    mount -o noatime,compress=zstd,ssd,discard=async,space_cache=v2,subvol=@home $BTRFS_PART /mnt/home
 
-    mount -o noatime,compress=zstd,ssd,discard=async,space_cache=v2,subvol=@var $INSTALL_DISK$BTRFS_PARTITION /mnt/var
-    mount $INSTALL_DISK$EFI_PARTITION /mnt/boot/efi/
+    mount -o noatime,compress=zstd,ssd,discard=async,space_cache=v2,subvol=@var $BTRFS_PART /mnt/var
+
+    mount $EFI_PART /mnt/boot
+
     statusMsg "success" "Sucessfully formatted $INSTALL_DISK as btrfs"
+    break
     ;;
   *)
     statusMsg "error" "Filesystem type unavailable"
@@ -229,7 +248,9 @@ echo "$HOSTNAME" >> /mnt/etc/hostname
 
 statusMsg "info" "Installing Grub"
 
-arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB
+arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
+
+sed -i "s/#GRUB_DISABLE_OS_PROBER=false/GRUB_DISABLE_OS_PROBER=false/" /mnt/etc/default/grub
 
 arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
 
@@ -264,9 +285,6 @@ if [ $ROOT_FILESYSTEM == "btrfs" ];
     statusMsg "info" "Creating initial ramdisk environment with btrfs support"
     sed -i "s/MODULES=()/MODULES=(btrfs)/" /etc/mkinitcpio.conf
     arch-chroot /mnt mkinitcpio -p linux
-  else
-    statusMsg "info" "Creating initial ramdisk environment"
-    arch-chroot /mnt mkinitcpio -P
 fi
 
 ## Install packages for desktop environment ##
@@ -302,7 +320,7 @@ arch-chroot /mnt /bin/passwd "$SUPER_USER"
 
 ## Unmounts drive ##
 
-umount -R /mnt
+umount -Rl /mnt
 
 ## Done ##
 
