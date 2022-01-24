@@ -14,7 +14,7 @@ HOSTNAME="Arch"
                                       
 INSTALL_DISK="/dev/vda"
 SWAP_PARTITION_SIZE="8G" # ext4 only. For btrfs, use zram from AUR
-ROOT_FILESYSTEM="ext4" # ext4 or btrfs.
+ROOT_FILESYSTEM="btrfs" # ext4 or btrfs.
 
 ## Desktop Environment - eg. Gnome minimal with firefox ##
 
@@ -284,8 +284,9 @@ if [ $ROOT_FILESYSTEM == "btrfs" ];
   then
     statusMsg "info" "Creating initial ramdisk environment with btrfs support"
     sed -i "s/MODULES=()/MODULES=(btrfs)/" /etc/mkinitcpio.conf
-    arch-chroot /mnt mkinitcpio -p linux
 fi
+
+arch-chroot /mnt mkinitcpio -p linux
 
 ## Install packages for desktop environment ##
 
