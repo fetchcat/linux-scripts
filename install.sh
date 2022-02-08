@@ -19,19 +19,27 @@ ROOT_FILESYSTEM="btrfs" # ext4 or btrfs.
 ## Desktop Environment - eg. Gnome minimal with firefox ##
 
 DESKTOP_ENVIRONMENT=(
-  "gnome-shell"
-  "gnome-tweaks"
-  "gnome-control-center"
-  "gnome-menus"
-  "gnome-terminal"
-  "firefox"
-  "gedit"
-  "nautilus"
+  "plasma-desktop"
+  "dolphin"
+  "dolphin-plugins"
+  "konsole"
+  "ark"
+  "kwrite"
+  "plasma-nm"
+  "plasma-pa"
+  "kdeplasma-addons"
+  "kde-gtk-config"
+  "powerdevil"
+  "bluedevil"
+  "kscreen"
+  "kinfocenter"
+  "plasma-browser-integration"
+  "sddm-kcm"
 )
 
 ## Display Manager ##
 
-DISPLAY_MANAGER="gdm" # gdm, sddm or lightdm
+DISPLAY_MANAGER="sddm" # gdm, sddm or lightdm
 
 ## Super User (added to wheel group)
 
@@ -45,7 +53,7 @@ MICROCODE="amd"
 
 PACSTRAP=(
   "base"
-  "linux" 
+  "linux-zen" 
   "linux-firmware"
   "vim" 
   "nano" 
@@ -286,7 +294,7 @@ if [ $ROOT_FILESYSTEM == "btrfs" ];
     sed -i "s/MODULES=()/MODULES=(btrfs)/" /etc/mkinitcpio.conf
 fi
 
-arch-chroot /mnt mkinitcpio -p linux
+arch-chroot /mnt mkinitcpio -p linux-zen
 
 ## Install packages for desktop environment ##
 
