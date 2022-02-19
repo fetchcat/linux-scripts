@@ -16,7 +16,7 @@ INSTALL_DISK="/dev/vda"
 SWAP_PARTITION_SIZE="8G" # ext4 only. For btrfs, use zram from AUR
 ROOT_FILESYSTEM="btrfs" # ext4 or btrfs.
 
-## Desktop Environment - eg. Gnome minimal with firefox ##
+## Desktop Environment - eg. KDE ##
 
 DESKTOP_ENVIRONMENT=(
   "plasma-desktop"
@@ -25,16 +25,17 @@ DESKTOP_ENVIRONMENT=(
   "konsole"
   "ark"
   "kwrite"
-  "plasma-nm"
   "plasma-pa"
   "kdeplasma-addons"
   "kde-gtk-config"
-  "powerdevil"
-  "bluedevil"
   "kscreen"
   "kinfocenter"
   "plasma-browser-integration"
+  "plasma-systemmonitor"
+  "systemsettings"
   "sddm-kcm"
+  "discover"
+  "packagekit-qt5"
 )
 
 ## Display Manager ##
