@@ -86,13 +86,13 @@ PACSTRAP=(
 statusMsg() {
 	case "$1" in 
 		"error" )
-		echo -e "\e[31m-> $2\e[0m"
+		echo -e "\e[91m-> $2\e[0m"
 		;;
 		"info" )
-		echo -e "\e[34m-> $2\e[0m"
+		echo -e "\e[94m-> $2\e[0m"
 		;;
 		"success" )
-		echo -e "\e[32m-> $2\e[0m"
+		echo -e "\e[92m-> $2\e[0m"
 		;;	
 		*) 
 		echo "No status type specified"
@@ -318,7 +318,7 @@ arch-chroot /mnt systemctl enable $DISPLAY_MANAGER
 statusMsg "info" "Setting permissions for super user: $SUPER_USER"
 
 arch-chroot /mnt useradd -mG wheel -s /bin/bash $SUPER_USER
-sed -i "s/# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/" /mnt/etc/sudoers
+arch-chroot /mnt sed -i "s/# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/" /etc/sudoers
 
 ## Set passwords ##
 
