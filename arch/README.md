@@ -18,30 +18,24 @@ User details, display manager, desktop environment, timezone...etc can be set at
 
 3. Clone Files to arch-install
 
-> git clone https://github.com/eraisuithiel/archinstall.git
+> git clone https://github.com/fetchcat/linux-scripts.git
 
 4. Make install script executable
 
-> chmod +x archinstall/install.sh
+> chmod +x linux-scripts/arch/install.sh
 
 5. Edit script for your system eg. locale, timezone, super user...etc.
 
-> nano archinstall/install.sh
+> nano linux-scripts/arch/install.sh
 
 6. Run Arch install script
 
-> ./archinstall/install.sh
+> ./linux-scripts/arch/install.sh
 
 ## Post Install Recommendations
 
-1. Install [Yay AUR Helper](https://github.com/Jguer/yay)
-2. Gnome extensions
-
-- [Dash to Panel](https://extensions.gnome.org/extension/1160/dash-to-panel/)
-- [Arc Menu](https://extensions.gnome.org/extension/3628/arcmenu/)
-- [User Themes](https://extensions.gnome.org/extension/19/user-themes/)
-
-3. For BTRFS Filesystem
+1. Install [Paru AUR Helper](https://github.com/Morganamilo/paru)
+2. For BTRFS Filesystem
 
 - [zramd](https://aur.archlinux.org/packages/zramd/) for swap
 - [grub-btrfs](https://archlinux.org/packages/community/any/grub-btrfs/) for grub-accessible BTRFS snapshots
