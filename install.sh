@@ -26,6 +26,7 @@ DESKTOP_ENVIRONMENT=(
   "ark"
   "kwrite"
   "plasma-pa"
+  "plasma-nm"
   "kdeplasma-addons"
   "kde-gtk-config"
   "kscreen"
@@ -46,6 +47,10 @@ DISPLAY_MANAGER="sddm" # gdm, sddm or lightdm
 
 SUPER_USER="arch"
 
+## Choose which kernel to install (eg. linux-zen, linux or linux-lts)
+
+KERNEL="linux-zen"
+
 ## Microcode for processor ##
 
 MICROCODE="amd"
@@ -54,7 +59,7 @@ MICROCODE="amd"
 
 PACSTRAP=(
   "base"
-  "linux-zen" 
+  "$KERNEL"
   "linux-firmware"
   "vim" 
   "nano" 
@@ -295,7 +300,7 @@ if [ $ROOT_FILESYSTEM == "btrfs" ];
     sed -i "s/MODULES=()/MODULES=(btrfs)/" /etc/mkinitcpio.conf
 fi
 
-arch-chroot /mnt mkinitcpio -p linux-zen
+arch-chroot /mnt mkinitcpio -p $KERNEL
 
 ## Install packages for desktop environment ##
 
@@ -318,7 +323,14 @@ arch-chroot /mnt systemctl enable $DISPLAY_MANAGER
 statusMsg "info" "Setting permissions for super user: $SUPER_USER"
 
 arch-chroot /mnt useradd -mG wheel -s /bin/bash $SUPER_USER
-arch-chroot /mnt sed -i "s/# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/" /etc/sudoers
+# arch-chroot /mnt sed -i "s/# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/" /etc/sudoers
+
+# arch-chroot /mnt visudo << EOF
+# :%s/^# %wheel ALL=(ALL) NO/%wheel ALL=(ALL) NO/g
+# :wq
+# EOF
+
+echo -e "%wheel ALL=(ALL) ALL\nDefaults rootpw" > /etc/sudoers.d/99_wheel 
 
 ## Set passwords ##
 
