@@ -322,15 +322,11 @@ arch-chroot /mnt systemctl enable $DISPLAY_MANAGER
 
 statusMsg "info" "Setting permissions for super user: $SUPER_USER"
 
-arch-chroot /mnt useradd -mG wheel -s /bin/bash $SUPER_USER
-# arch-chroot /mnt sed -i "s/# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/" /etc/sudoers
-
-# arch-chroot /mnt visudo << EOF
-# :%s/^# %wheel ALL=(ALL) NO/%wheel ALL=(ALL) NO/g
-# :wq
-# EOF
-
-echo -e "%wheel ALL=(ALL) ALL\nDefaults rootpw" > /etc/sudoers.d/99_wheel 
+touch /mnt/etc/sudoers.d/99_wheel
+cat << EOF > /mnt/etc/sudoers.d/99_wheel
+%wheel ALL=(ALL) ALL
+Defaults rootpw
+EOF
 
 ## Set passwords ##
 
