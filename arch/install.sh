@@ -207,6 +207,18 @@ case $ROOT_FILESYSTEM in
     return
 esac
 
+## Generate Pacman mirrors with Reflector ##
+
+statusMsg "info" "Generating best mirrors"
+
+reflector --country "$REFLECTOR_COUNTRIES" --protocol http,https --sort rate -l 10 --save /mnt/etc/pacman.d/mirrorlist
+
+## Update Pacman repos ##
+
+statusMsg "info" "Updating mirrors"
+
+arch-chroot /mnt pacman -Syu --noconfirm
+
 ## Install base Arch packages ##
 
 statusMsg "info" "Installing base packages"
@@ -273,18 +285,6 @@ arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
 statusMsg "info" "Enabling NetworkManager"
 
 arch-chroot /mnt systemctl enable NetworkManager
-
-## Generate Pacman mirrors with Reflector ##
-
-statusMsg "info" "Generating best mirrors"
-
-reflector --country "$REFLECTOR_COUNTRIES" --protocol http,https --sort rate -l 10 --save /mnt/etc/pacman.d/mirrorlist
-
-## Update Pacman repos ##
-
-statusMsg "info" "Updating mirrors"
-
-arch-chroot /mnt pacman -Syu --noconfirm
 
 ## Install CPU microcode ##
 
