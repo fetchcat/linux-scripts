@@ -88,6 +88,7 @@ PACSTRAP=(
   "xdg-user-dirs"
   "git"
   "base-devel"
+  "openssh"
 )
 
 ### --- --- --- Installation --- --- --- ###
