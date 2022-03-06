@@ -37,6 +37,14 @@ DESKTOP_ENVIRONMENT=(
   "sddm-kcm"
   "discover"
   "packagekit-qt5"
+  "qt5-tools"
+  "kwalletmanager"
+  "powerdevil"
+  "breeze-gtk"
+  "arc-gtk-theme"
+  "breeze-icons"
+  "papirus-icon-theme"
+  "firefox"
 )
 
 ## Display Manager ##
@@ -78,6 +86,8 @@ PACSTRAP=(
   "os-prober"
   "xdg-utils"
   "xdg-user-dirs"
+  "git"
+  "base-devel"
 )
 
 ### --- --- --- Installation --- --- --- ###
@@ -315,7 +325,7 @@ for pkg in ${DESKTOP_ENVIRONMENT[@]};
 
 statusMsg "info" "Installing and enabling Display Manager: $DISPLAY_MANAGER"
 
-arch-chroot /mnt pacman -S --noconfirm $DISPLAY_MANAGER
+arch-chroot /mnt pacman -S --noconfirm --needed $DISPLAY_MANAGER
 arch-chroot /mnt systemctl enable $DISPLAY_MANAGER
 
 ## Adds super user to system and wheel group ##
@@ -334,7 +344,7 @@ echo -e "Set Root password: "
 arch-chroot /mnt /bin/passwd
 
 echo -e "Set password for $SUPER_USER: "
-arch-chroot /mnt /bin/passwd "$SUPER_USER"
+arch-chroot /mnt /bin/passwd $SUPER_USER
 
 ## Unmounts drive ##
 
