@@ -8,7 +8,7 @@ CONSOLE_KEYMAP="us"
 TIMEZONE="America/Vancouver"
 LOCALE="en_US.UTF-8"
 REFLECTOR_COUNTRIES="CA,US"
-HOSTNAME="Arch"                        
+HOSTNAME="arch"                        
 
 ## Install disk and partition scheme ##
                                       
@@ -16,48 +16,13 @@ INSTALL_DISK="/dev/vda"
 SWAP_PARTITION_SIZE="8G" # ext4 only. For btrfs, use zram from AUR
 ROOT_FILESYSTEM="btrfs" # ext4 or btrfs.
 
-## Desktop Environment - eg. KDE ##
-
-DESKTOP_ENVIRONMENT=(
-  "plasma-desktop"
-  "dolphin"
-  "dolphin-plugins"
-  "konsole"
-  "ark"
-  "kwrite"
-  "plasma-pa"
-  "plasma-nm"
-  "kdeplasma-addons"
-  "kde-gtk-config"
-  "kscreen"
-  "kinfocenter"
-  "plasma-browser-integration"
-  "plasma-systemmonitor"
-  "systemsettings"
-  "sddm-kcm"
-  "discover"
-  "packagekit-qt5"
-  "qt5-tools"
-  "kwalletmanager"
-  "powerdevil"
-  "breeze-gtk"
-  "arc-gtk-theme"
-  "breeze-icons"
-  "papirus-icon-theme"
-  "firefox"
-)
-
-## Display Manager ##
-
-DISPLAY_MANAGER="sddm" # gdm, sddm or lightdm
-
 ## Super User (added to wheel group)
 
 SUPER_USER="arch"
 
 ## Choose which kernel to install (eg. linux-zen, linux or linux-lts)
 
-KERNEL="linux-zen"
+KERNEL="linux-lts"
 
 ## Microcode for processor ##
 
@@ -68,6 +33,7 @@ MICROCODE="amd"
 PACSTRAP=(
   "base"
   "$KERNEL"
+  "$KERNEL-headers"
   "linux-firmware"
   "vim" 
   "nano" 
@@ -87,8 +53,8 @@ PACSTRAP=(
   "xdg-utils"
   "xdg-user-dirs"
   "git"
-  "base-devel"
   "openssh"
+  "inetutils"
 )
 
 ### --- --- --- Installation --- --- --- ###
@@ -174,7 +140,6 @@ case $ROOT_FILESYSTEM in
 
     swapon $SWAP_PART
     statusMsg "success" "Sucessfully formatted $INSTALL_DISK as ext4"
-    break
     ;;
   btrfs)
     parted --script $INSTALL_DISK \
@@ -211,11 +176,7 @@ case $ROOT_FILESYSTEM in
     mount $EFI_PART /mnt/boot
 
     statusMsg "success" "Sucessfully formatted $INSTALL_DISK as btrfs"
-    break
     ;;
-  *)
-    statusMsg "error" "Filesystem type unavailable"
-    return
 esac
 
 ## Generate Pacman mirrors with Reflector ##
@@ -315,21 +276,33 @@ arch-chroot /mnt mkinitcpio -p $KERNEL
 
 ## Install packages for desktop environment ##
 
-statusMsg "info" "Installing Desktop Environment"
+statusMsg "info" "Please select Desktop Environment"
 
-for pkg in ${DESKTOP_ENVIRONMENT[@]};
-  do
-    arch-chroot /mnt pacman -S --noconfirm $pkg
-  done
-
-## Install and enable display manager ##
-
-statusMsg "info" "Installing and enabling Display Manager: $DISPLAY_MANAGER"
-
-arch-chroot /mnt pacman -S --noconfirm --needed $DISPLAY_MANAGER
-arch-chroot /mnt systemctl enable $DISPLAY_MANAGER
+select DE in Gnome KDE None
+do
+  case $DE in
+    Gnome)
+      arch-chroot /mnt pacman -S --noconfirm --needed gnome-shell nautilus gnome-terminal fragments gedit gnome-calendar gnome-desktop gnome-keyring gnome-session gnome-disk-utility tilix gnome-tweak-tool gnome-control-center papirus-icon-theme gnome-software firefox flatpak base-devel gdm
+      arch-chroot /mnt systemctl enable gdm
+      break
+      ;;
+    KDE)
+      arch-chroot /mnt pacman -S --noconfirm --needed plasma-desktop plasma-pa plasma-nm plasma-wayland-session dolphin ark konsole sddm-kcm dolphin-plugins kscreen kde-gtk-config kinfocenter kwrite plasma-browser-integration plasma-systemmonitor systemsettings powerdevil breeze-gtk arc-gtk-theme discover firefox packagekit-qt5 flatpak base-devel sddm
+      arch-chroot /mnt systemctl enable sddm
+      break
+      ;;
+    None)
+      break
+      ;;
+    *)
+      statusMsg "error" "Invalid option"
+      ;;
+  esac
+done
 
 ## Adds super user to system and wheel group ##
+
+arch-chroot /mnt useradd -mG wheel -s /bin/bash $SUPER_USER
 
 statusMsg "info" "Setting permissions for super user: $SUPER_USER"
 
