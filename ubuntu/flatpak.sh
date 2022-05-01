@@ -14,3 +14,5 @@ sudo apt install gnome-software-plugin-flatpak
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
 sudo apt update && apt upgrade
+
+echo -e "Be sure to reboot to enable full flatpak support"
